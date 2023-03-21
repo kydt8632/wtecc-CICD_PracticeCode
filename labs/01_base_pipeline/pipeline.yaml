@@ -1,6 +1,95 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:  
-  name: <place-name-here>
+  name: hello-pipeline # pipeline name
 spec:
+  params: # specify the params that would be used in one of the tasks
+    - name: message
   tasks:
+    - name: hello
+      taskRef: 
+        name: echo # refer to the task created in task.yaml
+      params:
+        - name: message
+          value: "$(params.message)" # assign the params with refering to the task
+
+# after running the pipeline with command tkn pipeline start --showlog hello-pipeline\
+#    --showlog  \
+#    -p message="Hello Tekton!"
+# the showed log:
+# [hello : echo-message] Hello Tekton!
+# [name of the task in pipeline : name if the step in tasks] 
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: cd-pipeline
+spec:
+  params:
+    - name: repo-url
+    - name: branch
+      default: "master"
+  tasks:
+    - name: clone
+      taskRef: 
+        name: checkout
+      params:
+      - name: repo-url
+        value: "$(params.repo-url)"
+      - name: branch
+        value: "$(params.branch)"
+
+    - name: lint
+      taskRef:
+        name: echo
+      params:
+      - name: message
+        value: "Calling Flake8 linter"
+      runAfter:
+        - clone
+
+    - name: tests
+      taskRef:
+        name: echo
+      params:
+      - name: message
+        value: "Running unit tests with PyUnit…"
+      runAfter:
+        - lint
+
+    - name: build
+      taskRef:
+        name: echo
+      params:
+      - name: message
+        value: "Building image for $(params.repo-url) …"
+      runAfter:
+        - tests
+
+    - name: deploy
+      taskRef:
+        name: echo
+      params:
+      - name: message
+        value: "Deploying $(params.branch) branch of $(params.repo-url) …"
+      runAfter:
+        - build
+
+# running Pipeline:
+# tkn pipeline start cd-pipeline \
+#    --showlog \
+#    -p repo-url="https://github.com/ibm-developer-skills-network/wtecc-CICD_PracticeCode.git" \
+#    -p branch="main"
+#
+# PipelineRun started: cd-pipeline-run-wvfzx
+# Waiting for logs to be available...
+# [clone : checkout] Cloning into 'wtecc-CICD_PracticeCode'...
+#
+# [lint : echo-message] Calling Flake8 linter...
+#
+# [tests : echo-message] Running unit tests with PyUnit...
+#
+# [build : echo-message] Building image for https://github.com/ibm-developer-skills-network/wtecc-CICD_PracticeCode.git ...
+#
+# [deploy : echo-message] Deploying main branch of https://github.com/ibm-developer-skills-network/wtecc-CICD_PracticeCode.git ...
